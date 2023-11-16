@@ -22,6 +22,7 @@ class ArCoreView extends StatefulWidget {
   final bool enableUpdateListener;
   final PlaneDetectionConfig planeDetectionConfig;
   final bool debug;
+  final bool showFeaturePoints;
   final String? customPlaneTexturePath;
   final ArCoreViewType type;
 
@@ -34,6 +35,7 @@ class ArCoreView extends StatefulWidget {
       this.customPlaneTexturePath,
       this.type = ArCoreViewType.STANDARDVIEW,
       this.debug = false,
+      this.showFeaturePoints = false,
       this.planeDetectionConfig = PlaneDetectionConfig.horizontal})
       : super(key: key);
 
@@ -73,7 +75,8 @@ class _ArCoreViewState extends State<ArCoreView> with WidgetsBindingObserver {
       enableUpdateListener: widget.enableUpdateListener,
       enablePlaneRenderer: widget.enablePlaneRenderer,
       planeDetectionConfig: widget.planeDetectionConfig,
-      customPlaneTexturePath: widget.customPlaneTexturePath
+      customPlaneTexturePath: widget.customPlaneTexturePath,
+      showFeaturePoints: widget.showFeaturePoints
 //      onUnsupported: widget.onArCoreUnsupported,
     ));
   }

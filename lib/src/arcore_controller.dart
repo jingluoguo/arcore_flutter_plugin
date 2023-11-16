@@ -39,6 +39,7 @@ class ArCoreController {
       this.enablePlaneRenderer,
       this.enableUpdateListener,
       this.debug = false,
+      this.showFeaturePoints = false,
       this.customPlaneTexturePath,
       required this.planeDetectionConfig,
 //    @required this.onUnsupported,
@@ -54,6 +55,7 @@ class ArCoreController {
   final bool? enablePlaneRenderer;
   final bool? debug;
   final String? customPlaneTexturePath;
+  final bool? showFeaturePoints;
   late MethodChannel _channel;
   StringResultHandler? onError;
   StringResultHandler? onNodeTap;
@@ -73,6 +75,7 @@ class ArCoreController {
         'enableUpdateListener': enableUpdateListener,
         'planeDetectionConfig': planeDetectionConfig.index,
         'customPlaneTexturePath': customPlaneTexturePath,
+        'showFeaturePoints': showFeaturePoints
       });
     } on PlatformException catch (ex) {
       print(ex.message);

@@ -46,6 +46,8 @@ import java.io.IOException
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 
+import java.nio.FloatBuffer
+
 import android.R
 import android.net.Uri
 
@@ -55,6 +57,12 @@ class ArCoreView(val activity: Activity, context: Context, messenger: BinaryMess
     lateinit var activityLifecycleCallbacks: Application.ActivityLifecycleCallbacks
     private var installRequested: Boolean = false
     private var mUserRequestedInstall = true
+
+    private var showFeaturePoints = false
+    private var pointCloudNode = Node()
+
+    private var enableUpdateListener: Boolean? = null
+
     private val TAG: String = ArCoreView::class.java.name
     private var arSceneView: ArSceneView? = null
     private val gestureDetector: GestureDetector
@@ -68,6 +76,21 @@ class ArCoreView(val activity: Activity, context: Context, messenger: BinaryMess
     private var faceRegionsRenderable: ModelRenderable? = null
     private var faceMeshTexture: Texture? = null
     private val faceNodeMap = HashMap<AugmentedFace, AugmentedFaceNode>()
+
+    private fun makeFeaturePointNode(context: Context, xPos: Float, yPos: Float, zPos: Float): Node {
+        val featurePoint = Node()
+        var cubeRenderable: ModelRenderable? = null
+        MaterialFactory.makeOpaqueWithColor(context, Color(android.graphics.Color.YELLOW))
+            .thenAccept { material ->
+                val vector3 = Vector3(0.01f, 0.01f, 0.01f)
+                cubeRenderable = ShapeFactory.makeCube(vector3, Vector3(xPos, yPos, zPos), material)
+                cubeRenderable?.isShadowCaster = false
+                cubeRenderable?.isShadowReceiver = false
+            }
+        featurePoint.renderable = cubeRenderable
+
+        return featurePoint
+    }
 
     init {
         methodChannel.setMethodCallHandler(this)
@@ -95,18 +118,49 @@ class ArCoreView(val activity: Activity, context: Context, messenger: BinaryMess
                 return@OnUpdateListener
             }
 
-            for (plane in frame.getUpdatedTrackables(Plane::class.java)) {
-                if (plane.trackingState == TrackingState.TRACKING) {
+            if (enableUpdateListener == true) {
+                // Set an update listener on the Scene that will hide the loading message once a Plane is
+                // detected.
+                for (plane in frame.getUpdatedTrackables(Plane::class.java)) {
+                    if (plane.trackingState == TrackingState.TRACKING) {
 
-                    val pose = plane.centerPose
-                    val map: HashMap<String, Any> = HashMap<String, Any>()
-                    map["type"] = plane.type.ordinal
-                    map["centerPose"] = FlutterArCorePose(pose.translation, pose.rotationQuaternion).toHashMap()
-                    map["extentX"] = plane.extentX
-                    map["extentZ"] = plane.extentZ
+                        val pose = plane.centerPose
+                        val map: HashMap<String, Any> = HashMap<String, Any>()
+                        map["type"] = plane.type.ordinal
+                        map["centerPose"] = FlutterArCorePose(pose.translation, pose.rotationQuaternion).toHashMap()
+                        map["extentX"] = plane.extentX
+                        map["extentZ"] = plane.extentZ
 
-                    methodChannel.invokeMethod("onPlaneDetected", map)
+                        methodChannel.invokeMethod("onPlaneDetected", map)
+                    }
                 }
+            }
+
+            if (showFeaturePoints) {
+                // remove points from last frame
+                while (pointCloudNode.children?.size
+                    ?: 0 > 0) {
+                    pointCloudNode.children?.first()?.setParent(null)
+                }
+                var pointCloud = arSceneView?.arFrame?.acquirePointCloud()
+                // Access point cloud data (returns FloatBufferw with x,y,z coordinates and confidence
+                // value).
+                val points = pointCloud?.getPoints() ?: FloatBuffer.allocate(0)
+                // Check if there are any feature points
+                if (points.limit() / 4 >= 1) {
+                    for (index in 0 until points.limit() / 4) {
+                        // Add feature point to scene
+                        val featurePoint =
+                            makeFeaturePointNode(
+                                viewContext,
+                                points.get(4 * index),
+                                points.get(4 * index + 1),
+                                points.get(4 * index + 2))
+                        featurePoint.setParent(pointCloudNode)
+                    }
+                }
+                // Release resources
+                pointCloud?.release()
             }
         }
 
@@ -387,6 +441,7 @@ class ArCoreView(val activity: Activity, context: Context, messenger: BinaryMess
     private fun arScenViewInit(call: MethodCall, result: MethodChannel.Result, context: Context) {
         debugLog("arScenViewInit")
         val enableTapRecognizer: Boolean? = call.argument("enableTapRecognizer")
+        val argShowFeaturePoints: Boolean? = call.argument<Boolean>("showFeaturePoints")
         val argCustomPlaneTexturePath: String? = call.argument<String>("customPlaneTexturePath")
         val argPlaneDetectionConfig: Int? = call.argument<Int>("planeDetectionConfig")
         if (enableTapRecognizer != null && enableTapRecognizer) {
@@ -404,12 +459,8 @@ class ArCoreView(val activity: Activity, context: Context, messenger: BinaryMess
                         return@setOnTouchListener gestureDetector.onTouchEvent(event)
                     }
         }
-        val enableUpdateListener: Boolean? = call.argument("enableUpdateListener")
-        if (enableUpdateListener != null && enableUpdateListener) {
-            // Set an update listener on the Scene that will hide the loading message once a Plane is
-            // detected.
-            arSceneView?.scene?.addOnUpdateListener(sceneUpdateListener)
-        }
+        arSceneView?.scene?.addOnUpdateListener(sceneUpdateListener)
+        enableUpdateListener = call.argument("enableUpdateListener")
 
 
         when (argPlaneDetectionConfig) {
@@ -425,6 +476,20 @@ class ArCoreView(val activity: Activity, context: Context, messenger: BinaryMess
             else -> {
                 planeFindingMode = Config.PlaneFindingMode.DISABLED
             }
+        }
+
+        // Configure feature points
+        if (argShowFeaturePoints ==
+            true) { // explicit comparison necessary because of nullable type
+            arSceneView?.scene?.addChild(pointCloudNode)
+            showFeaturePoints = true
+        } else {
+            showFeaturePoints = false
+            while (pointCloudNode.children?.size
+                ?: 0 > 0) {
+                pointCloudNode.children?.first()?.setParent(null)
+            }
+            pointCloudNode.setParent(null)
         }
 
         val config = arSceneView?.session?.config
