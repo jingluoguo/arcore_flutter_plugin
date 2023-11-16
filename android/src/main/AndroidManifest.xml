@@ -2,11 +2,12 @@
   package="com.difrancescogianmarco.arcore_flutter_plugin">
 
     <uses-permission android:name="android.permission.CAMERA" />
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
 
     <!-- Indicates that app requires ARCore ("AR Required"). Ensures app is only
          visible in the Google Play Store on devices that support ARCore.
     -->
-    <uses-feature android:name="android.hardware.camera.ar"/>
+<!--    <uses-feature android:name="android.hardware.camera.ar"/>-->
 
     <!-- Sceneform requires OpenGL ES 3.0 or later. -->
     <uses-feature android:glEsVersion="0x00030000" android:required="true" />
@@ -15,7 +16,7 @@
         <!-- Indicates that app requires ARCore ("AR Required"). Causes Google
              Play Store to download and install ARCore when the app is installed.
         -->
-        <meta-data android:name="com.google.ar.core" android:value="required" />
+        <meta-data android:name="com.google.ar.core" android:value="optional" />
     </application>
 
 </manifest>
