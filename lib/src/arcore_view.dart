@@ -7,26 +7,34 @@ typedef void ArCoreViewCreatedCallback(ArCoreController controller);
 
 enum ArCoreViewType { AUGMENTEDFACE, STANDARDVIEW, AUGMENTEDIMAGES }
 
+enum PlaneDetectionConfig {
+  none,
+  horizontal,
+  vertical,
+  horizontalAndVertical,
+}
+
 class ArCoreView extends StatefulWidget {
   final ArCoreViewCreatedCallback onArCoreViewCreated;
-
-//  final UnsupportedHandler onArCoreUnsupported;
 
   final bool enableTapRecognizer;
   final bool enablePlaneRenderer;
   final bool enableUpdateListener;
+  final PlaneDetectionConfig planeDetectionConfig;
   final bool debug;
+  final String? customPlaneTexturePath;
   final ArCoreViewType type;
 
   const ArCoreView(
       {Key? key,
       required this.onArCoreViewCreated,
-//    @required this.onArCoreUnsupported,
       this.enableTapRecognizer = false,
       this.enablePlaneRenderer = true,
       this.enableUpdateListener = false,
+      this.customPlaneTexturePath,
       this.type = ArCoreViewType.STANDARDVIEW,
-      this.debug = false})
+      this.debug = false,
+      this.planeDetectionConfig = PlaneDetectionConfig.horizontal})
       : super(key: key);
 
   @override
@@ -64,6 +72,8 @@ class _ArCoreViewState extends State<ArCoreView> with WidgetsBindingObserver {
       enableTapRecognizer: widget.enableTapRecognizer,
       enableUpdateListener: widget.enableUpdateListener,
       enablePlaneRenderer: widget.enablePlaneRenderer,
+      planeDetectionConfig: widget.planeDetectionConfig,
+      customPlaneTexturePath: widget.customPlaneTexturePath
 //      onUnsupported: widget.onArCoreUnsupported,
     ));
   }

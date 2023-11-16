@@ -21,10 +21,15 @@ import com.google.ar.core.exceptions.CameraNotAvailableException
 import com.google.ar.core.exceptions.UnavailableException
 import com.google.ar.core.exceptions.UnavailableUserDeclinedInstallationException
 import com.google.ar.sceneform.*
+import com.google.ar.sceneform.rendering.*
 import com.google.ar.sceneform.rendering.ModelRenderable
 import com.google.ar.sceneform.rendering.Texture
 import com.google.ar.sceneform.ux.AugmentedFaceNode
+import com.google.ar.sceneform.ux.*
+import com.google.ar.sceneform.math.Vector3
 import io.flutter.app.FlutterApplication
+import io.flutter.FlutterInjector
+import io.flutter.embedding.engine.loader.FlutterLoader
 import io.flutter.plugin.common.BinaryMessenger
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
@@ -41,6 +46,9 @@ import java.io.IOException
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 
+import android.R
+import android.net.Uri
+
 class ArCoreView(val activity: Activity, context: Context, messenger: BinaryMessenger, id: Int, private val isAugmentedFaces: Boolean, private val debug: Boolean) : PlatformView, MethodChannel.MethodCallHandler {
     private val methodChannel: MethodChannel = MethodChannel(messenger, "arcore_flutter_plugin_$id")
     //       private val activity: Activity = (context.applicationContext as FlutterApplication).currentActivity
@@ -54,6 +62,8 @@ class ArCoreView(val activity: Activity, context: Context, messenger: BinaryMess
     private var sceneUpdateListener: Scene.OnUpdateListener
     private var faceSceneUpdateListener: Scene.OnUpdateListener
 
+    private val viewContext: Context
+
     //AUGMENTEDFACE
     private var faceRegionsRenderable: ModelRenderable? = null
     private var faceMeshTexture: Texture? = null
@@ -62,6 +72,7 @@ class ArCoreView(val activity: Activity, context: Context, messenger: BinaryMess
     init {
         methodChannel.setMethodCallHandler(this)
         arSceneView = ArSceneView(context)
+        viewContext = context
         // Set up a tap gesture detector.
         gestureDetector = GestureDetector(
                 context,
@@ -372,9 +383,12 @@ class ArCoreView(val activity: Activity, context: Context, messenger: BinaryMess
         return mPath as String
     }
 
+    var planeFindingMode = Config.PlaneFindingMode.HORIZONTAL
     private fun arScenViewInit(call: MethodCall, result: MethodChannel.Result, context: Context) {
         debugLog("arScenViewInit")
         val enableTapRecognizer: Boolean? = call.argument("enableTapRecognizer")
+        val argCustomPlaneTexturePath: String? = call.argument<String>("customPlaneTexturePath")
+        val argPlaneDetectionConfig: Int? = call.argument<Int>("planeDetectionConfig")
         if (enableTapRecognizer != null && enableTapRecognizer) {
             arSceneView
                     ?.scene
@@ -397,10 +411,64 @@ class ArCoreView(val activity: Activity, context: Context, messenger: BinaryMess
             arSceneView?.scene?.addOnUpdateListener(sceneUpdateListener)
         }
 
+
+        when (argPlaneDetectionConfig) {
+            1 -> {
+                planeFindingMode = Config.PlaneFindingMode.HORIZONTAL
+            }
+            2 -> {
+                planeFindingMode = Config.PlaneFindingMode.VERTICAL
+            }
+            3 -> {
+                planeFindingMode = Config.PlaneFindingMode.HORIZONTAL_AND_VERTICAL
+            }
+            else -> {
+                planeFindingMode = Config.PlaneFindingMode.DISABLED
+            }
+        }
+
+        val config = arSceneView?.session?.config
+        if (config == null) {
+            debugLog("session is null")
+        } else {
+            arSceneView?.session?.configure(config)
+        }
+
         val enablePlaneRenderer: Boolean? = call.argument("enablePlaneRenderer")
         if (enablePlaneRenderer != null && !enablePlaneRenderer) {
             debugLog(" The plane renderer (enablePlaneRenderer) is set to " + enablePlaneRenderer.toString())
             arSceneView!!.planeRenderer.isVisible = false
+        }
+        argCustomPlaneTexturePath?.let {
+            val loader: FlutterLoader = FlutterInjector.instance().flutterLoader()
+            val key: String = loader.getLookupKeyForAsset(it)
+
+            val sampler =
+                Texture.Sampler.builder()
+                    .setMinFilter(Texture.Sampler.MinFilter.LINEAR)
+                    .setWrapMode(Texture.Sampler.WrapMode.REPEAT)
+                    .build();
+
+            Texture.builder()
+                .setSource(viewContext, Uri.parse(key))
+                .setSampler(sampler)
+                .build()
+                .thenAccept { texture ->
+                    arSceneView!!.planeRenderer.material.thenAccept { material ->
+                        material.setTexture(PlaneRenderer.MATERIAL_TEXTURE, texture)
+                        material.setFloat(PlaneRenderer.MATERIAL_SPOTLIGHT_RADIUS, 10f)
+                    }
+                }
+
+            // Set radius to render planes in
+            arSceneView?.scene?.addOnUpdateListener { frameTime ->
+                val planeRenderer = arSceneView!!.planeRenderer
+                planeRenderer.material.thenAccept { material ->
+                    material.setFloat(
+                        PlaneRenderer.MATERIAL_SPOTLIGHT_RADIUS,
+                        10f) // Sets the radius in which to visualize planes
+                }
+            }
         }
         
         result.success(null)
@@ -547,6 +615,9 @@ class ArCoreView(val activity: Activity, context: Context, messenger: BinaryMess
                     }
                     config.updateMode = Config.UpdateMode.LATEST_CAMERA_IMAGE
                     config.focusMode = Config.FocusMode.AUTO;
+
+                    config.planeFindingMode = planeFindingMode
+
                     session.configure(config)
                     arSceneView?.setupSession(session)
                 }
@@ -568,7 +639,6 @@ class ArCoreView(val activity: Activity, context: Context, messenger: BinaryMess
             activity.finish()
             return
         }
-
         if (arSceneView?.session != null) {
             //arSceneView!!.planeRenderer.isVisible = false
             debugLog("Searching for surfaces")

@@ -1,5 +1,6 @@
 import 'dart:typed_data';
 
+import 'package:arcore_flutter_plugin/arcore_flutter_plugin.dart';
 import 'package:arcore_flutter_plugin/src/arcore_augmented_image.dart';
 import 'package:arcore_flutter_plugin/src/arcore_rotating_node.dart';
 import 'package:arcore_flutter_plugin/src/utils/vector_utils.dart';
@@ -37,7 +38,9 @@ class ArCoreController {
       this.enableTapRecognizer,
       this.enablePlaneRenderer,
       this.enableUpdateListener,
-      this.debug = false
+      this.debug = false,
+      this.customPlaneTexturePath,
+      required this.planeDetectionConfig,
 //    @required this.onUnsupported,
       }) {
     _channel = MethodChannel('arcore_flutter_plugin_$id');
@@ -50,9 +53,11 @@ class ArCoreController {
   final bool? enableTapRecognizer;
   final bool? enablePlaneRenderer;
   final bool? debug;
+  final String? customPlaneTexturePath;
   late MethodChannel _channel;
   StringResultHandler? onError;
   StringResultHandler? onNodeTap;
+  final PlaneDetectionConfig planeDetectionConfig;
 
 //  UnsupportedHandler onUnsupported;
   ArCoreHitResultHandler? onPlaneTap;
@@ -66,6 +71,8 @@ class ArCoreController {
         'enableTapRecognizer': enableTapRecognizer,
         'enablePlaneRenderer': enablePlaneRenderer,
         'enableUpdateListener': enableUpdateListener,
+        'planeDetectionConfig': planeDetectionConfig.index,
+        'customPlaneTexturePath': customPlaneTexturePath,
       });
     } on PlatformException catch (ex) {
       print(ex.message);
@@ -242,6 +249,11 @@ class ArCoreController {
 
   void resume() {
     _channel.invokeMethod<void>('resume');
+  }
+
+  Future<String> snapshot() async {
+    final String path = await _channel.invokeMethod('takeScreenshot');
+    return path;
   }
 
   Future<void> removeNodeWithIndex(int index) async {
