@@ -338,6 +338,26 @@ class ArCoreView(val activity: Activity, context: Context, messenger: BinaryMess
                 debugLog(" Toggle planeRenderer visibility" )
                 arSceneView!!.planeRenderer.isVisible = !arSceneView!!.planeRenderer.isVisible
             }
+            "updateScale" -> {
+                val scale = call.argument<Double>("scale")
+                if (scale == null) {
+                    result.success(intArrayOf(0))
+                    return
+                }
+                val name = call.argument<String>("name")
+                if (name == null) {
+                    result.success(intArrayOf(0))
+                    return
+                }
+
+                val node: Node? = arSceneView?.scene?.findByName(name)
+                if (node == null) {
+                    result.success(intArrayOf(0))
+                    return
+                }
+                node.localScale = Vector3(scale.toFloat(), scale.toFloat(), scale.toFloat())
+                result.success(intArrayOf(1))
+            }
             else -> {
             }
         }

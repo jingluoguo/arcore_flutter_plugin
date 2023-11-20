@@ -29,17 +29,17 @@ class ArCoreController {
     return arcoreInstalled;
   }
 
-  ArCoreController(
-      {required this.id,
-      this.enableTapRecognizer,
-      this.enablePlaneRenderer,
-      this.enableUpdateListener,
-      this.debug = false,
-      this.showFeaturePoints = false,
-      this.customPlaneTexturePath,
-      required this.planeDetectionConfig,
+  ArCoreController({
+    required this.id,
+    this.enableTapRecognizer,
+    this.enablePlaneRenderer,
+    this.enableUpdateListener,
+    this.debug = false,
+    this.showFeaturePoints = false,
+    this.customPlaneTexturePath,
+    required this.planeDetectionConfig,
 //    @required this.onUnsupported,
-      }) {
+  }) {
     _channel = MethodChannel('arcore_flutter_plugin_$id');
     _channel.setMethodCallHandler(_handleMethodCalls);
     init();
@@ -137,9 +137,10 @@ class ArCoreController {
         if (onNodeUpdate != null) {
           try {
             var name = call.arguments['name'];
-            var transform = MatrixConverter().fromJson(call.arguments['transform']!);
+            var transform =
+                MatrixConverter().fromJson(call.arguments['transform']!);
             onNodeUpdate!(name, transform);
-          } catch (e){
+          } catch (e) {
             print("解析出错了.....${e.toString()}");
           }
         }
@@ -270,7 +271,7 @@ class ArCoreController {
   Future<Matrix4?> getCameraPose() async {
     try {
       final serializedCameraPose =
-      await _channel.invokeMethod<List<dynamic>>('getCameraPose', {});
+          await _channel.invokeMethod<List<dynamic>>('getCameraPose', {});
       return MatrixConverter().fromJson(serializedCameraPose!);
     } catch (e) {
       print('Error caught: ' + e.toString());
@@ -284,6 +285,12 @@ class ArCoreController {
     return projectPoint != null
         ? Vector3Converter().fromJson(projectPoint)
         : null;
+  }
+
+  Future<int> updateScale(String name, double scale) async {
+    final res = await _channel
+        .invokeListMethod<int>('updateScale', {'scale': scale, "name": name});
+    return res != null ? res.first : 0;
   }
 
   Future<void> removeNodeWithIndex(int index) async {
