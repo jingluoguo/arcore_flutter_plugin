@@ -1,20 +1,16 @@
-import 'dart:typed_data';
-
 import 'package:arcore_flutter_plugin/arcore_flutter_plugin.dart';
-import 'package:arcore_flutter_plugin/src/arcore_augmented_image.dart';
-import 'package:arcore_flutter_plugin/src/arcore_rotating_node.dart';
 import 'package:arcore_flutter_plugin/src/utils/vector_utils.dart';
 import 'package:flutter/services.dart';
 import 'package:meta/meta.dart';
+import 'package:vector_math/vector_math_64.dart';
 
-import 'arcore_hit_test_result.dart';
-import 'arcore_node.dart';
-import 'arcore_plane.dart';
+import 'utils/json_converters.dart';
 
 typedef StringResultHandler = void Function(String text);
 typedef UnsupportedHandler = void Function(String text);
 typedef ArCoreHitResultHandler = void Function(List<ArCoreHitTestResult> hits);
 typedef ArCorePlaneHandler = void Function(ArCorePlane plane);
+typedef NodeUpdate = void Function(String name, Matrix4 transform);
 typedef ArCoreAugmentedImageTrackingHandler = void Function(
     ArCoreAugmentedImage);
 
@@ -64,6 +60,7 @@ class ArCoreController {
 //  UnsupportedHandler onUnsupported;
   ArCoreHitResultHandler? onPlaneTap;
   ArCorePlaneHandler? onPlaneDetected;
+  NodeUpdate? onNodeUpdate;
   String trackingState = '';
   ArCoreAugmentedImageTrackingHandler? onTrackingImage;
 
@@ -135,6 +132,17 @@ class ArCoreController {
           print('Toggling Plane Renderer Visibility');
         }
         togglePlaneRenderer();
+        break;
+      case 'onNodeUpdate':
+        if (onNodeUpdate != null) {
+          try {
+            var name = call.arguments['name'];
+            var transform = MatrixConverter().fromJson(call.arguments['transform']!);
+            onNodeUpdate!(name, transform);
+          } catch (e){
+            print("解析出错了.....${e.toString()}");
+          }
+        }
         break;
 
       default:
@@ -257,6 +265,25 @@ class ArCoreController {
   Future<String> snapshot() async {
     final String path = await _channel.invokeMethod('takeScreenshot');
     return path;
+  }
+
+  Future<Matrix4?> getCameraPose() async {
+    try {
+      final serializedCameraPose =
+      await _channel.invokeMethod<List<dynamic>>('getCameraPose', {});
+      return MatrixConverter().fromJson(serializedCameraPose!);
+    } catch (e) {
+      print('Error caught: ' + e.toString());
+      return null;
+    }
+  }
+
+  Future<Vector3?> projectPoint(Vector3 point) async {
+    final projectPoint = await _channel.invokeListMethod<double>(
+        'projectPoint', {'point': Vector3Converter().toJson(point)});
+    return projectPoint != null
+        ? Vector3Converter().fromJson(projectPoint)
+        : null;
   }
 
   Future<void> removeNodeWithIndex(int index) async {

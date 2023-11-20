@@ -16,6 +16,7 @@ import com.difrancescogianmarco.arcore_flutter_plugin.flutter_models.FlutterArCo
 import com.difrancescogianmarco.arcore_flutter_plugin.flutter_models.FlutterArCorePose
 import com.difrancescogianmarco.arcore_flutter_plugin.models.RotatingNode
 import com.difrancescogianmarco.arcore_flutter_plugin.utils.ArCoreUtils
+import com.difrancescogianmarco.arcore_flutter_plugin.serialization.serializePose
 import com.google.ar.core.*
 import com.google.ar.core.exceptions.CameraNotAvailableException
 import com.google.ar.core.exceptions.UnavailableException
@@ -27,7 +28,6 @@ import com.google.ar.sceneform.rendering.Texture
 import com.google.ar.sceneform.ux.AugmentedFaceNode
 import com.google.ar.sceneform.ux.*
 import com.google.ar.sceneform.math.Vector3
-import io.flutter.app.FlutterApplication
 import io.flutter.FlutterInjector
 import io.flutter.embedding.engine.loader.FlutterLoader
 import io.flutter.plugin.common.BinaryMessenger
@@ -39,17 +39,15 @@ import android.graphics.Bitmap
 import android.os.Environment
 import android.view.PixelCopy
 import android.os.HandlerThread
-import android.content.ContextWrapper
 import java.io.FileOutputStream
 import java.io.File
 import java.io.IOException
-import java.time.LocalDateTime
-import java.time.format.DateTimeFormatter
 
 import java.nio.FloatBuffer
 
-import android.R
 import android.net.Uri
+import android.opengl.Matrix
+import com.google.ar.core.Camera
 
 class ArCoreView(val activity: Activity, context: Context, messenger: BinaryMessenger, id: Int, private val isAugmentedFaces: Boolean, private val debug: Boolean) : PlatformView, MethodChannel.MethodCallHandler {
     private val methodChannel: MethodChannel = MethodChannel(messenger, "arcore_flutter_plugin_$id")
@@ -69,6 +67,7 @@ class ArCoreView(val activity: Activity, context: Context, messenger: BinaryMess
     private val RC_PERMISSIONS = 0x123
     private var sceneUpdateListener: Scene.OnUpdateListener
     private var faceSceneUpdateListener: Scene.OnUpdateListener
+    private var nowSelectPlane: Plane? = null
 
     private val viewContext: Context
 
@@ -130,7 +129,7 @@ class ArCoreView(val activity: Activity, context: Context, messenger: BinaryMess
                         map["centerPose"] = FlutterArCorePose(pose.translation, pose.rotationQuaternion).toHashMap()
                         map["extentX"] = plane.extentX
                         map["extentZ"] = plane.extentZ
-
+                        nowSelectPlane = plane;
                         methodChannel.invokeMethod("onPlaneDetected", map)
                     }
                 }
@@ -287,6 +286,47 @@ class ArCoreView(val activity: Activity, context: Context, messenger: BinaryMess
                 debugLog("Resuming ARCore now")
                 onResume()
             }
+            "getCameraPose" -> {
+                val cameraPose = arSceneView?.arFrame?.camera?.displayOrientedPose
+                if (cameraPose != null) {
+                    result.success(serializePose(cameraPose))
+                } else {
+                    result.error("Error", "could not get camera pose", null)
+                }
+            }
+            "projectPoint" -> {
+                val point = call.argument<List<Double>>("point") ?: return
+                val frame: Frame = arSceneView?.arFrame ?: return
+                val camera: Camera = frame.camera
+
+                if (camera.trackingState != TrackingState.TRACKING) {
+                    return
+                }
+
+                val viewMatrix = FloatArray(16)
+                camera.getViewMatrix(viewMatrix, 0)
+
+                val projectionMatrix = FloatArray(16)
+                camera.getProjectionMatrix(projectionMatrix, 0, 0.1f, 100.0f)
+
+                val modelMatrix = FloatArray(16)
+                Matrix.setIdentityM(modelMatrix, 0)
+                Matrix.translateM(modelMatrix, 0, point[0].toFloat(), point[1].toFloat(), point[2].toFloat())
+
+                val modelViewProjectionMatrix = FloatArray(16)
+                Matrix.multiplyMM(modelViewProjectionMatrix, 0, viewMatrix, 0, modelMatrix, 0)
+                Matrix.multiplyMM(modelViewProjectionMatrix, 0, projectionMatrix, 0, modelViewProjectionMatrix, 0)
+
+                val normalizedPoint = floatArrayOf(0.0f, 0.0f, 0.0f, 1.0f)
+                Matrix.multiplyMV(normalizedPoint, 0, modelViewProjectionMatrix, 0, normalizedPoint, 0)
+
+                if (normalizedPoint[3] != 0.0f) {
+                    normalizedPoint[0] /= normalizedPoint[3]
+                    normalizedPoint[1] /= normalizedPoint[3]
+                    normalizedPoint[2] /= normalizedPoint[3]
+                }
+                result.success(normalizedPoint)
+            }
             "getTrackingState" -> {
                 debugLog("1/3: Requested tracking state, returning that back to Flutter now")
 
@@ -374,7 +414,12 @@ class ArCoreView(val activity: Activity, context: Context, messenger: BinaryMess
                         val distance: Float = hit.distance
                         val translation = hit.hitPose.translation
                         val rotation = hit.hitPose.rotationQuaternion
-                        val flutterArCoreHitTestResult = FlutterArCoreHitTestResult(distance, translation, rotation)
+
+                        val hitPose = hit.hitPose
+                        val matrix = FloatArray(16)
+                        hitPose.toMatrix(matrix, 0)
+
+                        val flutterArCoreHitTestResult = FlutterArCoreHitTestResult(distance, translation, rotation, matrix)
                         val arguments = flutterArCoreHitTestResult.toHashMap()
                         list.add(arguments)
                     }
@@ -539,6 +584,22 @@ class ArCoreView(val activity: Activity, context: Context, messenger: BinaryMess
         result.success(null)
     }
 
+    // 创建一个回调函数，该函数接受一个FrameTime对象作为参数
+    val onUpdateCallback: (anchor: Anchor, name: String) -> Unit = { anchor, name ->
+        val map: HashMap<String, Any> = HashMap<String, Any>()
+        map["name"] = name
+        val frame = arSceneView?.arFrame
+        if (frame != null) {
+            val cameraPose = frame.camera.pose
+            val relativePose = anchor.pose.inverse().compose(cameraPose);
+            val transformMatrix = FloatArray(16)
+            relativePose.toMatrix(transformMatrix, 0)
+            map["transform"] = transformMatrix
+
+            methodChannel.invokeMethod("onNodeUpdate", map)
+        }
+    }
+
     fun addNodeWithAnchor(flutterArCoreNode: FlutterArCoreNode, result: MethodChannel.Result) {
 
         if (arSceneView == null) {
@@ -552,9 +613,18 @@ class ArCoreView(val activity: Activity, context: Context, messenger: BinaryMess
             }
             val myAnchor = arSceneView?.session?.createAnchor(Pose(flutterArCoreNode.getPosition(), flutterArCoreNode.getRotation()))
             if (myAnchor != null) {
-                val anchorNode = AnchorNode(myAnchor)
+
+                var anchorNode = AnchorNode()
+
+                /// 当需要监听时，进行监听node结点
+                if (flutterArCoreNode.listen) {
+                    anchorNode = CustomAnchorNode(myAnchor, anchorNode.name, onUpdateCallback)
+                }
                 anchorNode.name = flutterArCoreNode.name
                 anchorNode.renderable = renderable
+
+                anchorNode.anchor = myAnchor
+                anchorNode.localScale = flutterArCoreNode.scale
 
                 debugLog("addNodeWithAnchor inserted ${anchorNode.name}")
                 attachNodeToParent(anchorNode, flutterArCoreNode.parentNodeName)
@@ -767,4 +837,11 @@ class ArCoreView(val activity: Activity, context: Context, messenger: BinaryMess
         node?.localPosition = parseVector3(call.arguments as HashMap<String, Any>)
         result.success(null)
     }*/
+}
+
+class CustomAnchorNode(anchor: Anchor, name: String, private val callbacks: (anchor: Anchor, name: String) -> Unit) : AnchorNode(anchor) {
+    override fun onUpdate(frameTime: FrameTime) {
+        super.onUpdate(frameTime)
+        callbacks.invoke(anchor!!, name)
+    }
 }

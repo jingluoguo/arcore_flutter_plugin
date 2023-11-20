@@ -14,6 +14,7 @@ class ArCoreNode {
     Vector3? position,
     Vector3? scale,
     Vector4? rotation,
+    this.listen = false,
     this.children = const [],
   })  : name = name ?? random_string.randomString(),
         position = position != null ? ValueNotifier(position) : null,
@@ -24,6 +25,9 @@ class ArCoreNode {
   final List<ArCoreNode>? children;
 
   final ArCoreShape? shape;
+
+  /// true：只监听父级，根据name进行监听
+  final bool? listen;
 
   final ValueNotifier<Vector3>? position;
 
@@ -43,6 +47,7 @@ class ArCoreNode {
         'rotation': convertVector4ToMap(rotation?.value),
         'name': name,
         'image': image?.toMap(),
+        'listen': listen,
         'children':
             this.children?.map((arCoreNode) => arCoreNode.toMap()).toList(),
       }..removeWhere((String k, dynamic v) => v == null);

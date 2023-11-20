@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:flutter/material.dart';
 import 'package:arcore_flutter_plugin/arcore_flutter_plugin.dart';
 import 'package:flutter/services.dart';
@@ -13,6 +15,8 @@ class ImageObjectScreen extends StatefulWidget {
 class _ImageObjectScreenState extends State<ImageObjectScreen> {
   ArCoreController? arCoreController;
 
+  Matrix4 transform = Matrix4.identity();
+
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
@@ -25,9 +29,9 @@ class _ImageObjectScreenState extends State<ImageObjectScreen> {
             ArCoreView(
               onArCoreViewCreated: _onArCoreViewCreated,
               enableTapRecognizer: true,
-              planeDetectionConfig: PlaneDetectionConfig.horizontalAndVertical,
+              enableUpdateListener: true,
+              planeDetectionConfig: PlaneDetectionConfig.horizontal,
               customPlaneTexturePath: "assets/triangle.png",
-              debug: true,
             ),
             Positioned(
                 bottom: 0,
@@ -51,29 +55,53 @@ class _ImageObjectScreenState extends State<ImageObjectScreen> {
   void _onArCoreViewCreated(ArCoreController controller) {
     arCoreController = controller;
     arCoreController?.onPlaneTap = _handleOnPlaneTap;
+    arCoreController?.onPlaneDetected = _handleOnPlaneDetected;
+    arCoreController?.onNodeUpdate = _handleOnNodeUpdate;
   }
 
   ArCoreNode? _now;
 
   Future _addImage(ArCoreHitTestResult hit) async {
-      await arCoreController?.removeNode(nodeName: "xxxx");
-      _now = null;
-      _now = ArCoreNode(
-        name: "xxxx",
-        image: ArCoreImage(bytes: widget.bytes, width: 120, height: 120),
-        position: hit.pose.translation + vector.Vector3(0.0, 0.0, 0.0),
-        rotation: hit.pose.rotation + vector.Vector4(0.0, 0.0, 0.0, 0.0),
-      );
+    await arCoreController?.removeNode(nodeName: "xxxx");
+    _now = null;
 
-      arCoreController?.addArCoreNodeWithAnchor(_now!);
+    vector.Vector4 originalVector = hit.pose.rotation;
 
-      /// 显示或隐藏平面点
-      await arCoreController?.togglePlaneRenderer();
+    vector.Vector4 test = vector.Vector4(
+      originalVector.x,
+      originalVector.y,
+      originalVector.z,
+      originalVector.w,
+    );
+
+    _now = ArCoreNode(
+      name: "test",
+      listen: true,
+      image: ArCoreImage(bytes: widget.bytes, width: 300, height: 300),
+      position: hit.pose.translation + vector.Vector3(0, 0, 0),
+      rotation: test,
+      scale: vector.Vector3(0.3, 0.3, 0.3)
+    );
+
+    arCoreController?.addArCoreNodeWithAnchor(_now!);
+
+    /// 显示或隐藏平面点
+    await arCoreController?.togglePlaneRenderer();
+
   }
 
   void _handleOnPlaneTap(List<ArCoreHitTestResult> hits) {
     final hit = hits.first;
     _addImage(hit);
+  }
+
+  ArCorePlane? plane;
+  void _handleOnPlaneDetected(ArCorePlane arCorePlane) {
+    plane = arCorePlane;
+  }
+
+  void _handleOnNodeUpdate(name, Matrix4 transform) {
+    print("这里是啥？${transform.storage}  xxxx: $transform");
   }
 
   @override
