@@ -69,7 +69,6 @@ class ArCoreView(val activity: Activity, context: Context, messenger: BinaryMess
     private val RC_PERMISSIONS = 0x123
     private var sceneUpdateListener: Scene.OnUpdateListener
     private var faceSceneUpdateListener: Scene.OnUpdateListener
-    private var nowSelectPlane: Plane? = null
 
     private val viewContext: Context
 
@@ -131,7 +130,6 @@ class ArCoreView(val activity: Activity, context: Context, messenger: BinaryMess
                         map["centerPose"] = FlutterArCorePose(pose.translation, pose.rotationQuaternion).toHashMap()
                         map["extentX"] = plane.extentX
                         map["extentZ"] = plane.extentZ
-                        nowSelectPlane = plane;
                         methodChannel.invokeMethod("onPlaneDetected", map)
                     }
                 }
@@ -608,7 +606,7 @@ class ArCoreView(val activity: Activity, context: Context, messenger: BinaryMess
 
     // 创建一个回调函数，该函数接受一个FrameTime对象作为参数
     val onUpdateCallback: (anchor: Anchor, name: String) -> Unit = { anchor, name ->
-        val map: HashMap<String, Any> = HashMap<String, Any>()
+        val map: HashMap<String, Any> = HashMap()
         map["name"] = name
         val frame = arSceneView?.arFrame
         if (frame != null) {
@@ -835,7 +833,6 @@ class ArCoreView(val activity: Activity, context: Context, messenger: BinaryMess
                 debugLog("Goodbye arSceneView.")
 
                 arSceneView?.destroy()
-                arSceneView = null
 
             }catch (e : Exception){
                 e.printStackTrace();
