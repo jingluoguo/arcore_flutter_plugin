@@ -632,16 +632,17 @@ class ArCoreView(val activity: Activity, context: Context, messenger: BinaryMess
             var rotation = flutterArCoreNode.getRotation()
 
             if (flutterArCoreNode.xAngle != null) {
-                position = floatArrayOf(
-                    position[0] * 1.5f,
-                    position[1],
-                    position[2] * 1.5f,
-                )
                 val upRotation = Quaternion.axisAngle(Vector3(1f, 0f, 0f), flutterArCoreNode.xAngle!!.toFloat())
                 rotation = floatArrayOf(upRotation.x,
                     upRotation.y,
                     upRotation.z,
                     upRotation.w)
+                val rotatedPosition = Quaternion.rotateVector(upRotation, Vector3(position[0],position[1], position[2]))
+                position = floatArrayOf(
+                    rotatedPosition.x,
+                    position[1],
+                    (rotatedPosition.z + position[2])/2,
+                )
             }
             val myAnchor = arSceneView?.session?.createAnchor(Pose(position, rotation))
             if (myAnchor != null) {
