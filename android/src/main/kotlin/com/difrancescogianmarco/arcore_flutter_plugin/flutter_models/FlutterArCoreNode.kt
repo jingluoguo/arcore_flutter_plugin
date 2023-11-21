@@ -28,6 +28,8 @@ class FlutterArCoreNode(map: HashMap<String, *>) {
 
     var xAngle: Double? = map["xAngle"] as? Double
 
+    var isShadowCaster: Boolean = map["isShadowCaster"] as? Boolean ?: true
+
     val children: ArrayList<FlutterArCoreNode> = getChildrenFromMap(map["children"] as ArrayList<HashMap<String, *>>)
 
     private fun getChildrenFromMap(list: ArrayList<HashMap<String, *>>): ArrayList<FlutterArCoreNode> {
@@ -94,7 +96,8 @@ class FlutterArCoreNode(map: HashMap<String, *>) {
                 "rotation: $rotation\n" +
                 "parentNodeName: $parentNodeName\n" +
                 "listen: $listen\n" +
-                "xAngle: $xAngle"
+                "xAngle: $xAngle\n" +
+                "isShadowCaster: $isShadowCaster\n"
     }
 
 }

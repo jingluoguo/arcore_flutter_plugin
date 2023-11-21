@@ -11,6 +11,7 @@ class ArCoreNode {
     this.shape,
     this.image,
     this.xAngle,
+    this.isShadowCaster = true,
     String? name,
     Vector3? position,
     Vector3? scale,
@@ -40,6 +41,9 @@ class ArCoreNode {
   /// 自定义anchor翻转角度，围绕X轴，值为空则使用rotation
   final double? xAngle;
 
+  /// 是否保留阴影，默认true
+  final bool isShadowCaster;
+
   final String? name;
 
   final ArCoreImage? image;
@@ -51,6 +55,7 @@ class ArCoreNode {
         'scale': convertVector3ToMap(scale?.value),
         'rotation': convertVector4ToMap(rotation?.value),
         'xAngle': xAngle,
+        'isShadowCaster': isShadowCaster,
         'name': name,
         'image': image?.toMap(),
         'listen': listen,

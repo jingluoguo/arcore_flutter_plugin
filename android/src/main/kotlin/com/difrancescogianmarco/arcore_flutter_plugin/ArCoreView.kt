@@ -660,6 +660,7 @@ class ArCoreView(val activity: Activity, context: Context, messenger: BinaryMess
                 }
                 anchorNode.name = flutterArCoreNode.name
                 anchorNode.renderable = renderable
+                renderable?.isShadowCaster = flutterArCoreNode.isShadowCaster
 
                 anchorNode.anchor = myAnchor
                 anchorNode.localScale = flutterArCoreNode.scale
