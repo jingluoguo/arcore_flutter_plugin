@@ -48,6 +48,8 @@ import java.nio.FloatBuffer
 import android.net.Uri
 import android.opengl.Matrix
 import com.google.ar.core.Camera
+import com.google.ar.sceneform.math.Quaternion
+import com.google.ar.sceneform.math.Quaternion.multiply
 
 class ArCoreView(val activity: Activity, context: Context, messenger: BinaryMessenger, id: Int, private val isAugmentedFaces: Boolean, private val debug: Boolean) : PlatformView, MethodChannel.MethodCallHandler {
     private val methodChannel: MethodChannel = MethodChannel(messenger, "arcore_flutter_plugin_$id")
@@ -631,7 +633,23 @@ class ArCoreView(val activity: Activity, context: Context, messenger: BinaryMess
                 result.error("Make Renderable Error", t.localizedMessage, null)
                 return@makeRenderable
             }
-            val myAnchor = arSceneView?.session?.createAnchor(Pose(flutterArCoreNode.getPosition(), flutterArCoreNode.getRotation()))
+
+            var position = flutterArCoreNode.getPosition()
+            var rotation = flutterArCoreNode.getRotation()
+
+            if (flutterArCoreNode.xAngle != null) {
+                position = floatArrayOf(
+                    position[0] * 1.5f,
+                    position[1],
+                    position[2] * 1.5f,
+                )
+                val upRotation = Quaternion.axisAngle(Vector3(1f, 0f, 0f), flutterArCoreNode.xAngle!!.toFloat())
+                rotation = floatArrayOf(upRotation.x,
+                    upRotation.y,
+                    upRotation.z,
+                    upRotation.w)
+            }
+            val myAnchor = arSceneView?.session?.createAnchor(Pose(position, rotation))
             if (myAnchor != null) {
 
                 var anchorNode = AnchorNode()

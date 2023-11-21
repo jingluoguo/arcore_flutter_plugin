@@ -10,10 +10,12 @@ class ArCoreNode {
   ArCoreNode({
     this.shape,
     this.image,
+    this.xAngle,
     String? name,
     Vector3? position,
     Vector3? scale,
     Vector4? rotation,
+
     this.listen = false,
     this.children = const [],
   })  : name = name ?? random_string.randomString(),
@@ -35,6 +37,9 @@ class ArCoreNode {
 
   final ValueNotifier<Vector4>? rotation;
 
+  /// 自定义anchor翻转角度，围绕X轴，值为空则使用rotation
+  final double? xAngle;
+
   final String? name;
 
   final ArCoreImage? image;
@@ -45,6 +50,7 @@ class ArCoreNode {
         'position': convertVector3ToMap(position?.value),
         'scale': convertVector3ToMap(scale?.value),
         'rotation': convertVector4ToMap(rotation?.value),
+        'xAngle': xAngle,
         'name': name,
         'image': image?.toMap(),
         'listen': listen,
