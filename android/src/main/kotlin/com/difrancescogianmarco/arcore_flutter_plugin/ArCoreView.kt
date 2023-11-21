@@ -748,7 +748,10 @@ class ArCoreView(val activity: Activity, context: Context, messenger: BinaryMess
         result.success(null)
     }
 
-    override fun getView(): View {
+    override fun getView(): View? {
+        if (arSceneView == null) {
+            return  null
+        }
         return arSceneView as View
     }
 
@@ -833,6 +836,7 @@ class ArCoreView(val activity: Activity, context: Context, messenger: BinaryMess
                 debugLog("Goodbye arSceneView.")
 
                 arSceneView?.destroy()
+                arSceneView = null
 
             }catch (e : Exception){
                 e.printStackTrace();
