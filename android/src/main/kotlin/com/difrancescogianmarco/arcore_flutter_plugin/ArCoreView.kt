@@ -202,6 +202,7 @@ class ArCoreView(val activity: Activity, context: Context, messenger: BinaryMess
         // Lastly request CAMERA permission which is required by ARCore.
         ArCoreUtils.requestCameraPermission(activity, RC_PERMISSIONS)
         setupLifeCycle(context)
+        onResume() // call onResume once to setup initial session
     }
 
     fun debugLog(message: String) {
@@ -502,13 +503,14 @@ class ArCoreView(val activity: Activity, context: Context, messenger: BinaryMess
         return mPath as String
     }
 
-    var planeFindingMode = Config.PlaneFindingMode.HORIZONTAL
+//    var planeFindingMode = Config.PlaneFindingMode.HORIZONTAL
     private fun arScenViewInit(call: MethodCall, result: MethodChannel.Result, context: Context) {
         debugLog("arScenViewInit")
         val enableTapRecognizer: Boolean? = call.argument("enableTapRecognizer")
         val argShowFeaturePoints: Boolean? = call.argument<Boolean>("showFeaturePoints")
         val argCustomPlaneTexturePath: String? = call.argument<String>("customPlaneTexturePath")
         val argPlaneDetectionConfig: Int? = call.argument<Int>("planeDetectionConfig")
+        val argEnableDrag: Boolean? = call.argument<Boolean>("argEnableDrag")
         if (enableTapRecognizer != null && enableTapRecognizer) {
             arSceneView
                     ?.scene
@@ -527,21 +529,28 @@ class ArCoreView(val activity: Activity, context: Context, messenger: BinaryMess
         arSceneView?.scene?.addOnUpdateListener(sceneUpdateListener)
         enableUpdateListener = call.argument("enableUpdateListener")
 
-
+        val config = arSceneView?.session?.config
         when (argPlaneDetectionConfig) {
             1 -> {
-                planeFindingMode = Config.PlaneFindingMode.HORIZONTAL
+                config?.planeFindingMode = Config.PlaneFindingMode.HORIZONTAL
             }
+
             2 -> {
-                planeFindingMode = Config.PlaneFindingMode.VERTICAL
+                config?.planeFindingMode = Config.PlaneFindingMode.VERTICAL
             }
+
             3 -> {
-                planeFindingMode = Config.PlaneFindingMode.HORIZONTAL_AND_VERTICAL
+                config?.planeFindingMode = Config.PlaneFindingMode.HORIZONTAL_AND_VERTICAL
             }
+
             else -> {
-                planeFindingMode = Config.PlaneFindingMode.DISABLED
+                config?.planeFindingMode = Config.PlaneFindingMode.DISABLED
             }
         }
+        arSceneView?.session?.configure(config)
+
+        val enablePlaneRenderer: Boolean? = call.argument("enablePlaneRenderer")
+        arSceneView?.planeRenderer?.isVisible = enablePlaneRenderer == true
 
         // Configure feature points
         if (argShowFeaturePoints ==
@@ -555,19 +564,6 @@ class ArCoreView(val activity: Activity, context: Context, messenger: BinaryMess
                 pointCloudNode.children?.first()?.setParent(null)
             }
             pointCloudNode.setParent(null)
-        }
-
-        val config = arSceneView?.session?.config
-        if (config == null) {
-            debugLog("session is null")
-        } else {
-            arSceneView?.session?.configure(config)
-        }
-
-        val enablePlaneRenderer: Boolean? = call.argument("enablePlaneRenderer")
-        if (enablePlaneRenderer != null && !enablePlaneRenderer) {
-            debugLog(" The plane renderer (enablePlaneRenderer) is set to " + enablePlaneRenderer.toString())
-            arSceneView!!.planeRenderer.isVisible = false
         }
         argCustomPlaneTexturePath?.let {
             val loader: FlutterLoader = FlutterInjector.instance().flutterLoader()
@@ -791,7 +787,7 @@ class ArCoreView(val activity: Activity, context: Context, messenger: BinaryMess
                     config.updateMode = Config.UpdateMode.LATEST_CAMERA_IMAGE
                     config.focusMode = Config.FocusMode.AUTO;
 
-                    config.planeFindingMode = planeFindingMode
+//                    config.planeFindingMode = planeFindingMode
 
                     session.configure(config)
                     arSceneView?.setupSession(session)
@@ -835,6 +831,7 @@ class ArCoreView(val activity: Activity, context: Context, messenger: BinaryMess
                 arSceneView?.scene?.removeOnUpdateListener(faceSceneUpdateListener)
                 debugLog("Goodbye arSceneView.")
 
+                arSceneView?.session?.close()
                 arSceneView?.destroy()
                 arSceneView = null
 
