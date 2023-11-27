@@ -640,7 +640,7 @@ class ArCoreView(val activity: Activity, context: Context, messenger: BinaryMess
                     upRotation.w)
                 val rotatedPosition = Quaternion.rotateVector(upRotation, Vector3(position[0],position[1], position[2]))
                 position = floatArrayOf(
-                    rotatedPosition.x,
+                    (rotatedPosition.x + position[0])/2,
                     position[1],
                     (rotatedPosition.z + position[2])/2,
                 )
