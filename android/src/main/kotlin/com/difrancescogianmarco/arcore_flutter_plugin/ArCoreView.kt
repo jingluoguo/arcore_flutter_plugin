@@ -435,12 +435,13 @@ class ArCoreView(val activity: Activity, context: Context, messenger: BinaryMess
                         val distance: Float = hit.distance
                         val translation = hit.hitPose.translation
                         val rotation = hit.hitPose.rotationQuaternion
+                        val type = trackable.type.ordinal
 
                         val hitPose = hit.hitPose
                         val matrix = FloatArray(16)
                         hitPose.toMatrix(matrix, 0)
 
-                        val flutterArCoreHitTestResult = FlutterArCoreHitTestResult(distance, translation, rotation, matrix)
+                        val flutterArCoreHitTestResult = FlutterArCoreHitTestResult(distance, translation, rotation, matrix, type)
                         val arguments = flutterArCoreHitTestResult.toHashMap()
                         list.add(arguments)
                     }
